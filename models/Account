@@ -1,0 +1,180 @@
+<?php
+	class Account{
+		private $id;
+	    private $username;
+	    private $email;
+	    private $password;
+	    private $createDate;
+	    private $status;
+	    private $activationKey; 
+
+	    function __construct($id,$username,$email,$password,$createDate,$status,$activationKey){
+	        $this->id=$id;
+	        $this->username=$username;
+	        $this->email=$email;
+	        $this->password=$password;
+	        $this->createDate=$createDate;
+	        $this->status=$status;
+	        $this->activationKey=$activationKey;
+	    }
+	    //verify the account
+		public static function getsignin($username, $password) {
+			$db = DBConfig::getInstance();
+	      	$sth = $db->prepare('select * from user where username = ?');
+	    	$sth->execute(array($username));
+			if($sth->rowCount()==1){ 
+	        	$row=$sth->fetch();
+	         	if($row['status'] == 'activated'){
+	         		if (hash_equals($password, $row['password'])) {
+				   return 'Sign in successfully!';
+	         		}
+				}
+		    }
+		    else return 'Oops, it seems like an invalid account!';
+		}
+		//return account info
+		public static function getinfobyid($id){
+			$db = DBConfig::getInstance();
+	      	$sth = $db->query('select * from user where id = '.intval($id).'');
+	      	if($sth->rowCount()==1) {
+	      		$user = $sth->fetch();
+	      		return new Account($user['id'], $user['username'], $user['email'], $user['password'],
+                                          $user['createDate'], $user['status'], $user['activationKey']);
+	      	}
+	      	else return NULL;
+		}
+
+		public static function getinfobyusername($username){
+			$db = DBConfig::getInstance();
+	      	$sth = $db->prepare('select * from user where username = ?');
+	      	$sth->execute(array($username));
+	      	if($sth->rowCount()==1) {
+	      		$user = $sth->fetch();
+	      		return new Account($user['id'], $user['username'], $user['email'], $user['password'],
+                                          $user['createDate'], $user['status'], $user['activationKey']);
+	      	}
+	      	else return NULL;
+		}
+		public static function getinfobyemail($email){
+			$db = DBConfig::getInstance();
+	      	$sth = $db->prepare('select * from user where email = ?');
+	      	$sth->execute(array($email));
+	      	if($sth->rowCount()==1) {
+	      		$user = $sth->fetch();
+	      		return new Account($user['id'], $user['username'], $user['email'], $user['password'],
+                                          $user['createDate'], $user['status'], $user['activationKey']);
+	      	}
+	      	else return NULL;
+		}
+		//insert a new account
+		public static function insert($username, $email, $password){
+	        $db = DBConfig::getInstance();
+	  		
+	  		#create a activationKey
+			$activationKey =   mt_rand() .$email .mt_rand() .mt_rand() .mt_rand() .mt_rand() .$username;
+	        
+	        $sth = $db->prepare('INSERT INTO user (`username`, `email`, `password`, `activationKey`, `status`)
+	        	VALUES (?,?,?,?,?)');
+	           
+	        $sth->execute(array($username, $email, $password, $activationKey, 'unverified'));
+	    }
+
+	    public static function update($id, $username, $email, $password){
+	        $db = DBConfig::getInstance();
+	        
+	        if($username==NULL&&$password==NULL&&$email!=NULL){
+	        	$sth = $db->prepare('UPDATE user SET `email` = ? WHERE `id` = ?');
+	           
+	        	$sth->execute(array($email, intval($id)));
+	        }else if($username!=NULL&&$password==NULL&&$email==NULL){
+	        	$sth = $db->prepare('UPDATE user SET `username` = ? WHERE `id` = ?');
+	           
+	        	$sth->execute(array($username, intval($id)));
+	        }else if($username==NULL&&$password!=NULL&&$email==NULL) {
+	        	$sth = $db->prepare('UPDATE user SET `password` = ? WHERE `id` = ?');
+	           
+	        	$sth->execute(array($password, intval($id)));	
+	        }else if($username!=NULL&&$password==NULL&&$email!=NULL){
+	        	$sth = $db->prepare('UPDATE user SET `username` = ?, `email` = ? WHERE `id` = ?');
+	           
+	        	$sth->execute(array($username, $email, intval($id)));
+	        }else if($username!=NULL&&$password!=NULL&&$email==NULL) {
+	        	$sth = $db->prepare('UPDATE user SET `username` = ?, `password` = ? WHERE `id` = ?');
+	           
+	        	$sth->execute(array($username, $password, intval($id)));	
+	        }else if($username==NULL&&$password!=NULL&&$email!=NULL) {
+	        	$sth = $db->prepare('UPDATE user SET `password` = ?, `email` = ? WHERE `id` = ?');
+	           
+	        	$sth->execute(array($password, $email, intval($id)));	
+	        }else if($username!=NULL&&$password!=NULL&&$email!=NULL) {
+	        	$sth = $db->prepare('UPDATE user SET `username` = ?, `password` = ?, `email` = ? WHERE `id` = ?');
+	           
+	        	$sth->execute(array($username, $password, $email, intval($id)));	
+	        }
+	    }
+
+	    public static function delete($id){
+	    	$db = DBConfig::getInstance();
+  	    	$sth = $db->prepare('DELETE FROM user where id = ?');
+	        $sth->execute(array(intval($id)));
+	    }
+
+	    //update status as verified
+	    public static function getactivated($id){
+	    	$db = DBConfig::getInstance();
+  	    	$sth = $db->prepare('UPDATE user SET `activationKey` = ?, `status` = ? WHERE `id` = ?');
+  	    	$sth->execute(array(NULL,'activated', intval($id)));
+	    }
+
+	    //check activationKey
+	    public static function activationKeyExist($activationKey){
+	    	$db = DBConfig::getInstance();
+  	    	$sth = $db->query('SELECT `id`, `username`, `email` FROM user WHERE `activationKey` = '.'\''.$activationKey.'\''.'');
+	        return $sth->fetch();
+	    }
+
+	    public static function show(){
+	    	$list = [];
+	    	$db = DBConfig::getInstance();
+  	    	$sth = $db->query('SELECT * FROM user ');
+	       
+	        foreach ($sth->fetchAll() as $user) {
+	        	$list[] = new Account($user['id'], $user['username'], $user['email'], $user['password'],
+                                          $user['createDate'], $user['status'], $user['activationKey']); 
+	        };
+	       
+	        return $list;
+	    }
+
+
+	    //return id
+        public function getID(){
+            return $this->id;
+        }
+        //return username
+        public function getUsername(){
+            return $this->username;
+        }
+        //return email
+        public function getEmail(){
+            return $this->email;
+        }
+        //return createDate
+        public function getCreateDate(){
+            return $this->createDate;
+        }
+        //return status
+        public function getStatus(){
+            return $this->status;
+        }
+        //return activationKey
+        public function getActivationKey(){
+            return $this->activationKey;
+        }
+
+        //return password
+        public function getPassword(){
+            return $this->password;
+        }
+	}
+?>
